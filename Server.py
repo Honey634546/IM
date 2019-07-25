@@ -58,6 +58,9 @@ class Server(object):
             elif datas[0] == "/msg":
                 self.talk(recvdata)
             elif datas[0] == "/exit":
+                for k, v in self.dick.items():
+                    if v == client:
+                        del self.dick[k]
                 self.linklist.remove(client)
                 client.close()
                 print(addr + 'closed')
@@ -131,6 +134,10 @@ class Server(object):
             client.send('No account exists'.encode())
 
     def Log_out(self, client):
+        for k, v in self.dick.items():
+            if v == client:
+                del self.dick[k]
+                break
         client.send("Offline Success".encode())
 
     def getpassword(self, account):
@@ -141,8 +148,6 @@ class Server(object):
         conn = sqlite3.connect('user_data.db')
         cur = conn.cursor()
         data = cur.execute("select password from user where account='%s'" % account).fetchone()
-        print(data)
-        print(type(data))
         conn.commit()
         cur.close()
         if data is None:
