@@ -1,6 +1,6 @@
 from socket import *
 import threading
-import time
+import struct
 
 
 def recvmsg(client):
@@ -28,5 +28,8 @@ if __name__ == '__main__':
         # if rec:
         # print(rec.decode())
         data = input("").encode()
+        header = struct.pack('i', len(data))
+        tcpCliSock.send(header)
+
         tcpCliSock.send(data)
     tcpCliSock.close()

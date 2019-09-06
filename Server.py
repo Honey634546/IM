@@ -1,6 +1,8 @@
 from socket import *
 import threading
 import sqlite3
+import hashlib
+import struct
 
 
 class Server(object):
@@ -42,31 +44,42 @@ class Server(object):
         :return:
         """
         while True:
-            recvdata = client.recv(1024).decode()
-            print(addr, ':', recvdata)
-            datas = recvdata.split()
-            if datas[0] == "/r":
-                self.register(client, datas)
-            elif datas[0] == "/login":
-                self.Log_in(client, datas)
-            elif datas[0] == "/logout":
-                self.Log_out(client)
-            elif datas[0] == "/showall":
-                self.showall(client)
-            elif datas[0] == "/all":
-                self.Mass_msg(recvdata)
-            elif datas[0] == "/msg":
-                self.talk(recvdata)
-            elif datas[0] == "/exit":
-                for k, v in self.dick.items():
-                    if v == client:
-                        del self.dick[k]
-                self.linklist.remove(client)
-                client.close()
-                print(addr + 'closed')
-                break
-            else:
-                client.send('Instruction error'.encode())
+            try:
+                recvheader = client.recv(4)
+                size = struct.unpack('i', recvheader)[0]
+                recv_size = 0
+                recvdata = b''
+                while recv_size < size:
+                    data = client.recv(1024)
+                    recvdata += data
+                    recv_size += len(data)
+                recvdata = recvdata.decode()
+                print(addr, ':', recvdata)
+                datas = recvdata.split()
+                if datas[0] == "/r":
+                    self.register(client, datas)
+                elif datas[0] == "/login":
+                    self.Log_in(client, datas)
+                elif datas[0] == "/logout":
+                    self.Log_out(client)
+                elif datas[0] == "/showall":
+                    self.showall(client)
+                elif datas[0] == "/all":
+                    self.Mass_msg(recvdata)
+                elif datas[0] == "/msg":
+                    self.talk(recvdata)
+                elif datas[0] == "/exit":
+                    for k, v in self.dick.items():
+                        if v == client:
+                            del self.dick[k]
+                    self.linklist.remove(client)
+                    client.close()
+                    print(addr + 'closed')
+                    break
+                else:
+                    client.send('Instruction error'.encode())
+            except ConnectionResetError:
+                return
 
     def create_sql(self):
         """
@@ -106,8 +119,10 @@ class Server(object):
         print(data)
         if not data:
             if password == password2:
+                # 密码最好加密，不要储存明文密码
+                pwd = self.encryption(password)
                 cur.execute("insert into user values('%s','%s')"
-                            % (account, str(password)))
+                            % (account, str(pwd)))
                 conn.commit()
                 client.send('Successful'.encode())
             else:
@@ -117,6 +132,12 @@ class Server(object):
         cur.close()
 
     def Log_in(self, client, datas):
+        """
+        登录
+        :param client:
+        :param datas:
+        :return:
+        """
         try:
             account = datas[1]
             password = str(datas[2])
@@ -134,6 +155,11 @@ class Server(object):
             client.send('No account exists'.encode())
 
     def Log_out(self, client):
+        """
+        登出
+        :param client:
+        :return:
+        """
         for k, v in self.dick.items():
             if v == client:
                 del self.dick[k]
@@ -155,10 +181,20 @@ class Server(object):
         return str(data[0])
 
     def showall(self, client):
+        """
+        显示当前在线用户
+        :param client:
+        :return:
+        """
         for user in self.dick.keys():
             client.send(user.encode())
 
     def Mass_msg(self, data):
+        """
+        向在线的所有人发消息
+        :param data:
+        :return:
+        """
         datas = data.split(" ", 1)
         for client in self.dick.values():
             try:
@@ -167,6 +203,11 @@ class Server(object):
                 return
 
     def talk(self, data):
+        """
+        向指定的人发送消息
+        :param data:
+        :return:
+        """
         try:
             datas = data.split(" ", 2)
             sb = datas[1]
@@ -174,6 +215,16 @@ class Server(object):
         except:
             return
         self.dick.get(sb).send(msg.encode())
+
+    def encryption(self, password):
+        """
+        加密密码
+        :param password: enable password
+        :return: Ciphertext password
+        """
+        h = hashlib.md5()
+        h.update(password.encode())
+        return h.hexdigest()
 
 
 if __name__ == '__main__':
