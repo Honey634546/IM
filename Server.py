@@ -67,7 +67,7 @@ class Server(object):
                 elif datas[0] == "/all":
                     self.Mass_msg(recvdata)
                 elif datas[0] == "/msg":
-                    self.talk(recvdata)
+                    self.talk(client, recvdata)
                 elif datas[0] == "/exit":
                     for k, v in self.dick.items():
                         if v == client:
@@ -111,7 +111,7 @@ class Server(object):
             password = str(datas[2])
             password2 = str(datas[3])
         except:
-            # client.send('指令错误'.encode())
+            client.send('order error'.encode())
             return
         conn = sqlite3.connect("user_data.db")
         cur = conn.cursor()
@@ -142,6 +142,8 @@ class Server(object):
             account = datas[1]
             password = str(datas[2])
             password2 = self.getpassword(account)
+
+            password = self.encryption(password)
         except:
             return
 
@@ -174,11 +176,13 @@ class Server(object):
         conn = sqlite3.connect('user_data.db')
         cur = conn.cursor()
         data = cur.execute("select password from user where account='%s'" % account).fetchone()
+        print(data)
         conn.commit()
         cur.close()
         if data is None:
             return data
-        return str(data[0])
+
+        return data[0]
 
     def showall(self, client):
         """
@@ -202,7 +206,7 @@ class Server(object):
             except:
                 return
 
-    def talk(self, data):
+    def talk(self, client, data):
         """
         向指定的人发送消息
         :param data:
@@ -214,7 +218,15 @@ class Server(object):
             msg = datas[2]
         except:
             return
-        self.dick.get(sb).send(msg.encode())
+        for k, v in self.dick.items():
+            if v == client:
+                account = k
+                break
+        message = account + ":" + msg
+        if len(message) >= 1024:
+            client.send('消息过长请分开发送'.encode())
+            return
+        self.dick.get(sb).send(message.encode())
 
     def encryption(self, password):
         """
