@@ -1,3 +1,4 @@
+# coding=utf-8
 from socket import *
 import threading
 import sqlite3
@@ -30,11 +31,26 @@ class Server(object):
         while True:
             client, addr = server.accept()
             self.linklist.append(client)
-            client.send(b'welcome')
+            data = 'welcome'
+            self.send(client, data)
             print(addr, 'connected')
             t = threading.Thread(target=self.tcplink, args=(client, addr))
             t.start()
         server.close()
+
+    def send(self, client, data):
+        """
+        对发送信息进行包装，解决粘包问题
+        向客户端先发送头，在发送信息
+        :param client:
+        :param data: <str> or <byte>
+        :return:
+        """
+        if isinstance(data, str):
+            data = data.encode()
+        header = struct.pack('i', len(data))
+        client.send(header)
+        client.send(data)
 
     def tcplink(self, client, addr):
         """
@@ -77,7 +93,9 @@ class Server(object):
                     print(addr + 'closed')
                     break
                 else:
-                    client.send('Instruction error'.encode())
+                    data = 'Instruction error'
+                    self.send(client, data)
+                    # client.send('Instruction error'.encode())
             except ConnectionResetError:
                 return
 
@@ -91,7 +109,7 @@ class Server(object):
         cur.execute(
             """create table if not exists
             %s(
-            %s varchar(128) primary key, 
+            %s varchar(128) primary key,
             %s varchar(128)
             )"""
             % ('user',
@@ -110,12 +128,16 @@ class Server(object):
             account = datas[1]
             password = str(datas[2])
             password2 = str(datas[3])
-        except:
-            client.send('order error'.encode())
+        except BaseException:
+            data = 'order error'
+            self.send(client, data)
+            # client.send('order error'.encode())
             return
         conn = sqlite3.connect("user_data.db")
         cur = conn.cursor()
-        data = cur.execute("select * from user where account='%s'" % account).fetchone()
+        data = cur.execute(
+            "select * from user where account='%s'" %
+            account).fetchone()
         print(data)
         if not data:
             if password == password2:
@@ -124,11 +146,17 @@ class Server(object):
                 cur.execute("insert into user values('%s','%s')"
                             % (account, str(pwd)))
                 conn.commit()
-                client.send('Successful'.encode())
+                data = 'Successful'
+                self.send(client, data)
+                # client.send('Successful'.encode())
             else:
-                client.send('Two Password Inconsistencies'.encode())
+                data = 'Two Password Inconsistencies'
+                self.send(client, data)
+            # client.send('Two Password Inconsistencies'.encode())
         else:
-            client.send("User Existing".encode())
+            data = 'User Existing'
+            self.send(client, data)
+            # client.send("User Existing".encode())
         cur.close()
 
     def Log_in(self, client, datas):
@@ -144,17 +172,26 @@ class Server(object):
             password2 = self.getpassword(account)
 
             password = self.encryption(password)
-        except:
+        except BaseException:
+            data = 'order error'
+            self.send(client, data)
+            # client.send('order error'.encode())
             return
 
         if password2 is not None:
             if password == password2:
                 self.dick[account] = client
-                client.send('Successful'.encode())
+                data = 'Successful'
+                self.send(client, data)
+                # client.send('Successful'.encode())
             else:
-                client.send('Password error'.encode())
+                data = 'Password error'
+                self.send(client, data)
+                # client.send('Password error'.encode())
         else:
-            client.send('No account exists'.encode())
+            data = 'No account exists'
+            self.send(client, data)
+            # client.send('No account exists'.encode())
 
     def Log_out(self, client):
         """
@@ -166,7 +203,9 @@ class Server(object):
             if v == client:
                 del self.dick[k]
                 break
-        client.send("Offline Success".encode())
+        data = 'Offline Success'
+        self.send(client, data)
+        # client.send("Offline Success".encode())
 
     def getpassword(self, account):
         """
@@ -175,7 +214,9 @@ class Server(object):
         """
         conn = sqlite3.connect('user_data.db')
         cur = conn.cursor()
-        data = cur.execute("select password from user where account='%s'" % account).fetchone()
+        data = cur.execute(
+            "select password from user where account='%s'" %
+            account).fetchone()
         print(data)
         conn.commit()
         cur.close()
@@ -191,7 +232,8 @@ class Server(object):
         :return:
         """
         for user in self.dick.keys():
-            client.send(user.encode())
+            self.send(client, user)
+            # client.send(user.encode())
 
     def Mass_msg(self, data):
         """
@@ -202,8 +244,12 @@ class Server(object):
         datas = data.split(" ", 1)
         for client in self.dick.values():
             try:
-                client.send(datas[1].encode())
-            except:
+                self.send(client, datas[1])
+                # client.send(datas[1].encode())
+            except BaseException:
+                data = 'order error'
+                self.send(client, data)
+                # client.send('order error'.encode())
                 return
 
     def talk(self, client, data):
@@ -216,17 +262,23 @@ class Server(object):
             datas = data.split(" ", 2)
             sb = datas[1]
             msg = datas[2]
-        except:
+        except BaseException:
+            data = 'order error'
+            self.send(client, data)
+            # client.send('order error'.encode())
             return
         for k, v in self.dick.items():
             if v == client:
                 account = k
                 break
-        message = account + ":" + msg
-        if len(message) >= 1024:
-            client.send('消息过长请分开发送'.encode())
-            return
-        self.dick.get(sb).send(message.encode())
+        try:
+            message = account + ":" + msg
+            client1 = self.dick.get(sb)
+            self.send(client1, message)
+            # self.dick.get(sb).send(message.encode())
+        except BaseException:
+            data = '目标不在线'
+            self.send(client, data)
 
     def encryption(self, password):
         """

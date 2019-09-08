@@ -6,11 +6,19 @@ import struct
 def recvmsg(client):
     while True:
         try:
-            rec = client.recv(BUFSIZE).decode()
-        except:
+            recvheader = client.recv(4)
+            size = struct.unpack('i', recvheader)[0]
+            recv_size = 0
+            recvdata = b''
+            while recv_size < size:
+                data = client.recv(1024)
+                recvdata += data
+                recv_size += len(data)
+            recvdata = recvdata.decode()
+        except BaseException:
             continue
-        if rec:
-            print(rec)
+        if recvdata:
+            print(recvdata)
 
 
 if __name__ == '__main__':
