@@ -9,7 +9,7 @@ An Instant Messaging without GUI
     6.Private message to specified user
     7.Without GUI, it can run in Command Line mode
   
-1. Registration:
+1.Registration:
     
     format:
     /r account password confirmation password
@@ -17,7 +17,7 @@ An Instant Messaging without GUI
     Example:
     /r test 123456 123456
 
-2. Login
+2.Login
     
     format
     /login account password
@@ -25,7 +25,7 @@ An Instant Messaging without GUI
     Example
     /login test 123456
     
-3. Logout
+3.Logout
     
     format
     /logout
@@ -56,5 +56,10 @@ An Instant Messaging without GUI
     
     Example
     /msg test Hi,I'm Tom!
+    
+    
+
+
+解决了粘包问题
 
   
